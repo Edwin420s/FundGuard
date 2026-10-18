@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: omega-fundguard-api
+    env: python
+    buildCommand: pip install -r backend/requirements.txt && cd backend && alembic upgrade head
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ENABLE_TESTNET
+        value: "true"
+      - key: ENABLE_MAINNET
+        value: "false"
+      - key: LOG_LEVEL
+        value: "INFO"
