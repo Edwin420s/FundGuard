@@ -77,8 +77,10 @@ Base path: `/api/v1`. OpenAPI Interactive UI: `/docs`. JSON responses.
     "eligibility_status": "pending",
     "eligibility_note": "Verified Grant Winner"
   }
-  ```
 - `POST /competitions/{competition_id}/recipients/{recipient_id}/verify` — Organizer review and eligibility verification.
+- `GET /competitions/{competition_id}/recipients/template.csv` — Download sample CSV template with valid ed25519 public keys.
+- `POST /competitions/{competition_id}/recipients/bulk` — Bulk register recipients via JSON payload with optional auto-verification.
+- `POST /competitions/{competition_id}/recipients/upload-csv` — Upload a CSV file (`multipart/form-data`) containing recipient names and Stellar wallet addresses. Validates StrKey ed25519 checksums, skips duplicate wallets, and records aggregate audit events.
 
 ---
 

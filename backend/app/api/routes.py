@@ -2,7 +2,8 @@ import csv
 import io
 import json
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Response, UploadFile
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.agent.evaluator import AgentEvaluator
@@ -21,6 +22,8 @@ from app.schemas import (
     AgentRunRequest,
     ApprovalRequest,
     BatchCreate,
+    BulkRecipientCreate,
+    BulkRecipientItem,
     CompetitionCreate,
     ExecuteRequest,
     LearnedRuleCreate,
@@ -213,6 +216,203 @@ def verify_recipient(competition_id: str, recipient_id: str, reviewer: str = "Fi
     db.commit()
     db.refresh(r)
     return {"id": r.id, "eligibility_status": r.eligibility_status, "eligibility_note": r.eligibility_note}
+
+@router.get("/competitions/{competition_id}/recipients/template.csv")
+def get_recipients_template():
+    csv_text = (
+        "name,wallet_address,notes\n"
+        "Alpha Pioneers,GA7SFOTHBSSRUGL4NUYZXCQTO2MDDJYUIEVPYIYPCYD2BR2RQOVNXIHD,Finalist recipient\n"
+        "Beta Innovators,GB2GGSI4Q4JUC2K4HSCDYDK5XAZQD5DXTRC3COL4QZRHLZBSGDK4DPVW,Track award winner\n"
+        "Gamma Protocol,GCRXSDVF23OPVXSXBUQJWQ3VMWGOX24YUGLB3CDBYOVV23CIAVTIPSJH,Grant cohort team\n"
+    )
+    return StreamingResponse(
+        io.StringIO(csv_text),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=recipients_template.csv"}
+    )
+
+@router.post("/competitions/{competition_id}/recipients/bulk")
+def post_recipients_bulk(competition_id: str, payload: BulkRecipientCreate, db: Session = Depends(get_db)):
+    comp = db.get(Competition, competition_id)
+    if not comp:
+        raise HTTPException(404, "Competition not found")
+
+    existing_recipients = db.query(Recipient).filter_by(competition_id=competition_id).all()
+    existing_wallets = {r.wallet_address.strip() for r in existing_recipients}
+
+    created = []
+    errors = []
+    seen_in_batch = set()
+
+    for idx, item in enumerate(payload.recipients):
+        row_num = idx + 1
+        name = (item.display_name or "").strip()
+        wallet = (item.wallet_address or "").strip()
+        note = (item.eligibility_note or "").strip()
+
+        if not name:
+            errors.append({"row": row_num, "name": name, "wallet": wallet, "error": "Display name is required"})
+            continue
+
+        if not wallet:
+            errors.append({"row": row_num, "name": name, "wallet": wallet, "error": "Wallet address is required"})
+            continue
+
+        if not validate_stellar_address(wallet):
+            errors.append({"row": row_num, "name": name, "wallet": wallet, "error": "Invalid Stellar ed25519 public address (must start with 'G' and be 56 characters)"})
+            continue
+
+        if wallet in existing_wallets:
+            errors.append({"row": row_num, "name": name, "wallet": wallet, "error": "Wallet address is already registered in this workspace"})
+            continue
+
+        if wallet in seen_in_batch:
+            errors.append({"row": row_num, "name": name, "wallet": wallet, "error": "Duplicate wallet address within this import batch"})
+            continue
+
+        seen_in_batch.add(wallet)
+        existing_wallets.add(wallet)
+
+        initial_note = note or ("Bulk imported recipient" if not payload.auto_verify else f"Verified via bulk import by {payload.reviewer}")
+        row = Recipient(
+            competition_id=competition_id,
+            organization_id=comp.organization_id,
+            display_name=name,
+            wallet_address=wallet,
+            eligibility_status="pending",
+            eligibility_note=initial_note,
+            evidence_json=json.dumps(item.evidence or {"source": "bulk_import"})
+        )
+        db.add(row)
+        db.flush()
+
+        add_audit(
+            db,
+            competition_id=competition_id,
+            entity_type="recipient",
+            entity_id=row.id,
+            action="recipient.created",
+            actor=payload.created_by,
+            correlation_id=correlation_id(),
+            details={"display_name": row.display_name, "eligibility_status": "pending", "source": "bulk_import"}
+        )
+
+        if payload.auto_verify:
+            row.eligibility_status = "verified"
+            add_audit(
+                db,
+                competition_id=competition_id,
+                entity_type="recipient",
+                entity_id=row.id,
+                action="recipient.verified",
+                actor=payload.reviewer,
+                correlation_id=correlation_id(),
+                details={"reviewer": payload.reviewer, "note": row.eligibility_note}
+            )
+
+        created.append(row)
+
+    if created:
+        add_audit(
+            db,
+            competition_id=competition_id,
+            entity_type="competition",
+            entity_id=competition_id,
+            action="recipients.bulk_imported",
+            actor=payload.created_by,
+            correlation_id=correlation_id(),
+            details={"imported_count": len(created), "skipped_count": len(errors), "auto_verified": payload.auto_verify}
+        )
+        db.commit()
+    elif not errors:
+        db.commit()
+
+    return {
+        "total": len(payload.recipients),
+        "imported_count": len(created),
+        "skipped_count": len(errors),
+        "recipients": [{
+            "id": r.id,
+            "competition_id": r.competition_id,
+            "display_name": r.display_name,
+            "wallet_address": r.wallet_address,
+            "eligibility_status": r.eligibility_status,
+            "eligibility_note": r.eligibility_note,
+            "is_valid_strkey": True,
+            "created_at": r.created_at.isoformat()
+        } for r in created],
+        "errors": errors
+    }
+
+@router.post("/competitions/{competition_id}/recipients/upload-csv")
+async def post_recipients_upload_csv(
+    competition_id: str,
+    file: UploadFile = File(...),
+    auto_verify: bool = Form(default=False),
+    reviewer: str = Form(default="CSV Import Reviewer"),
+    created_by: str = Form(default="Administrator"),
+    db: Session = Depends(get_db)
+):
+    comp = db.get(Competition, competition_id)
+    if not comp:
+        raise HTTPException(404, "Competition not found")
+
+    content_bytes = await file.read()
+    try:
+        text = content_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        try:
+            text = content_bytes.decode("latin-1")
+        except Exception as e:
+            raise HTTPException(422, f"Could not decode CSV file: {str(e)}")
+
+    reader = csv.reader(io.StringIO(text))
+    rows = list(reader)
+    if not rows:
+        raise HTTPException(422, "The uploaded CSV file is empty.")
+
+    first_row = [str(c).strip().lower().replace(" ", "_") for c in rows[0]]
+    has_header = False
+    name_col = -1
+    wallet_col = -1
+    note_col = -1
+
+    for idx, col in enumerate(first_row):
+        if col in ("name", "display_name", "team", "team_name", "recipient", "recipient_name"):
+            name_col = idx
+            has_header = True
+        elif col in ("wallet", "wallet_address", "address", "stellar_address", "public_key", "key", "strkey"):
+            wallet_col = idx
+            has_header = True
+        elif col in ("notes", "note", "eligibility_note", "review_note", "comments", "description"):
+            note_col = idx
+            has_header = True
+
+    data_rows = rows[1:] if has_header else rows
+    if not has_header:
+        name_col = 0
+        wallet_col = 1 if len(rows[0]) > 1 else -1
+        note_col = 2 if len(rows[0]) > 2 else -1
+
+    if wallet_col == -1:
+        wallet_col = 1
+
+    items = []
+    for r in data_rows:
+        if not r or all(not str(c).strip() for c in r):
+            continue
+        d_name = str(r[name_col]).strip() if 0 <= name_col < len(r) else ""
+        d_wallet = str(r[wallet_col]).strip() if 0 <= wallet_col < len(r) else ""
+        d_note = str(r[note_col]).strip() if 0 <= note_col < len(r) else ""
+        items.append(BulkRecipientItem(display_name=d_name, wallet_address=d_wallet, eligibility_note=d_note))
+
+    bulk_payload = BulkRecipientCreate(
+        recipients=items,
+        auto_verify=auto_verify,
+        reviewer=reviewer,
+        created_by=created_by
+    )
+    return post_recipients_bulk(competition_id, bulk_payload, db)
 
 # Batches
 @router.post("/competitions/{competition_id}/batches", status_code=201)

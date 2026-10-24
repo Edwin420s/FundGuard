@@ -80,6 +80,21 @@ describe('FundGuard Dashboard UI', () => {
     expect(screen.getByRole('heading', { level: 2, name: /Recipient Directory/i })).toBeTruthy()
   })
 
+  it('supports switching to CSV upload mode and displays bulk upload options', () => {
+    render(<App />)
+    const recTabBtn = screen.getByRole('button', { name: /Recipients & Teams/i })
+    fireEvent.click(recTabBtn)
+
+    const csvTabBtn = screen.getByRole('button', { name: /Upload CSV File/i })
+    expect(csvTabBtn).toBeTruthy()
+    fireEvent.click(csvTabBtn)
+
+    expect(screen.getByText(/Bulk Import Recipients via CSV/i)).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Download Sample CSV/i })).toBeTruthy()
+    expect(screen.getByText(/Click to select a CSV file or drag and drop/i)).toBeTruthy()
+    expect(screen.getByText(/Automatically mark imported recipients as Verified/i)).toBeTruthy()
+  })
+
   it('navigates to Award Rules & Calculator tab and displays calculator', () => {
     render(<App />)
     const policyTabBtn = screen.getByRole('button', { name: /Award Rules & Calculator/i })

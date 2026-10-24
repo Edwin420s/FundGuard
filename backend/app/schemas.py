@@ -63,6 +63,18 @@ class RecipientCreate(BaseModel):
     evidence: dict[str, Any] = Field(default_factory=dict)
     created_by: str = Field(default="Administrator", max_length=160)
 
+class BulkRecipientItem(BaseModel):
+    display_name: str = Field(default="", max_length=160)
+    wallet_address: str = Field(default="", max_length=80)
+    eligibility_note: str = Field(default="", max_length=2000)
+    evidence: dict[str, Any] = Field(default_factory=dict)
+
+class BulkRecipientCreate(BaseModel):
+    recipients: list[BulkRecipientItem] = Field(default_factory=list, max_length=1000)
+    auto_verify: bool = Field(default=False)
+    reviewer: str = Field(default="Bulk Import Reviewer", max_length=160)
+    created_by: str = Field(default="Administrator", max_length=160)
+
 class BatchCreate(BaseModel):
     recipient_ids: list[str] = Field(min_length=1, max_length=500)
     amount_base_units: int = Field(gt=0, le=2_000_000_000_000)

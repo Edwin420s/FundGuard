@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import LandingPage from './LandingPage.jsx'
 import SignupPage from './SignupPage.jsx'
 import LoginPage from './LoginPage.jsx'
@@ -84,6 +84,16 @@ function App({ initialView = null }) {
   const [recipientName, setRecipientName] = useState('')
   const [wallet, setWallet] = useState('')
   const [recipientNote, setRecipientNote] = useState('Track winner submission verified by organizer')
+
+  // Recipient CSV Upload State
+  const [recipientMode, setRecipientMode] = useState('single') // 'single' | 'csv'
+  const [csvFile, setCsvFile] = useState(null)
+  const [csvRows, setCsvRows] = useState([])
+  const [csvAutoVerify, setCsvAutoVerify] = useState(false)
+  const [csvErrors, setCsvErrors] = useState([])
+  const [csvSuccessMsg, setCsvSuccessMsg] = useState('')
+  const [csvImporting, setCsvImporting] = useState(false)
+  const fileInputRef = useRef(null)
 
   // Manual Batch Creation Form (amounts in XLM)
   const [selectedRecipients, setSelectedRecipients] = useState([])
@@ -412,6 +422,162 @@ function App({ initialView = null }) {
       await request(`/competitions/${selected}/recipients/${id}/verify?reviewer=${encodeURIComponent(activeActor)}`, { method: 'POST' })
       await loadAll()
       notify('Recipient eligibility verified by reviewer.')
+    })
+  }
+
+  function downloadSampleCsv() {
+    const csvContent =
+      "name,wallet_address,notes\n" +
+      "Alpha Pioneers,GA7SFOTHBSSRUGL4NUYZXCQTO2MDDJYUIEVPYIYPCYD2BR2RQOVNXIHD,Finalist recipient\n" +
+      "Beta Innovators,GB2GGSI4Q4JUC2K4HSCDYDK5XAZQD5DXTRC3COL4QZRHLZBSGDK4DPVW,Track award winner\n" +
+      "Gamma Protocol,GCRXSDVF23OPVXSXBUQJWQ3VMWGOX24YUGLB3CDBYOVV23CIAVTIPSJH,Grant cohort team\n"
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', 'recipients_template.csv')
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  function handleCsvFileSelect(file) {
+    if (!file) return
+    setCsvFile(file)
+    setCsvErrors([])
+    setCsvSuccessMsg('')
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const text = e.target?.result
+      if (!text || typeof text !== 'string') return
+      const parsed = parseCsvRecipients(text)
+      setCsvRows(parsed)
+    }
+    reader.readAsText(file)
+  }
+
+  function parseCsvRecipients(text) {
+    const lines = text.split(/\r\n|\n/).filter(line => line.trim().length > 0)
+    if (lines.length === 0) return []
+
+    const splitLine = (l) => {
+      const res = []
+      let curr = ''
+      let inQuotes = false
+      for (let i = 0; i < l.length; i++) {
+        const ch = l[i]
+        if (ch === '"') inQuotes = !inQuotes
+        else if (ch === ',' && !inQuotes) { res.push(curr.trim()); curr = '' }
+        else curr += ch
+      }
+      res.push(curr.trim())
+      return res
+    }
+
+    const firstRow = splitLine(lines[0]).map(c => c.toLowerCase().replace(/[\s_]+/g, ''))
+    let nameIdx = -1, walletIdx = -1, noteIdx = -1
+    let hasHeaders = false
+
+    firstRow.forEach((col, idx) => {
+      if (['name', 'displayname', 'team', 'teamname', 'recipient', 'recipientname'].includes(col)) {
+        nameIdx = idx; hasHeaders = true
+      } else if (['wallet', 'walletaddress', 'address', 'stellaraddress', 'publickey', 'key', 'strkey'].includes(col)) {
+        walletIdx = idx; hasHeaders = true
+      } else if (['notes', 'note', 'eligibilitynote', 'reviewnotes', 'comments', 'description'].includes(col)) {
+        noteIdx = idx; hasHeaders = true
+      }
+    })
+
+    const dataLines = hasHeaders ? lines.slice(1) : lines
+    if (!hasHeaders) {
+      nameIdx = 0
+      walletIdx = 1
+      noteIdx = 2
+    }
+
+    return dataLines.map((line, idx) => {
+      const cols = splitLine(line)
+      const name = cols[nameIdx] || ''
+      const wallet = cols[walletIdx] || ''
+      const note = cols[noteIdx] || ''
+      const isValidStrKey = /^G[A-Z2-7]{55}$/.test(wallet)
+      return {
+        rowNum: idx + 1,
+        name,
+        wallet,
+        note,
+        isValidStrKey,
+        error: !name ? 'Missing name' : !wallet ? 'Missing address' : !isValidStrKey ? 'Invalid Stellar ed25519 address' : null
+      }
+    }).filter(r => r.name || r.wallet)
+  }
+
+  function resetCsvUpload() {
+    setCsvFile(null)
+    setCsvRows([])
+    setCsvErrors([])
+    setCsvSuccessMsg('')
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  async function importCsvRecipients() {
+    if (!csvFile && csvRows.length === 0) return
+    await run(async () => {
+      setCsvImporting(true)
+      try {
+        let result
+        if (csvFile) {
+          const formData = new FormData()
+          formData.append('file', csvFile)
+          formData.append('auto_verify', csvAutoVerify ? 'true' : 'false')
+          formData.append('reviewer', activeActor)
+          formData.append('created_by', activeActor)
+
+          const token = localStorage.getItem('fundguard_token')
+          const headers = {}
+          if (token) headers['Authorization'] = `Bearer ${token}`
+
+          const res = await fetch(`${API}/api/v1/competitions/${selected}/recipients/upload-csv`, {
+            method: 'POST',
+            headers,
+            body: formData
+          })
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err.detail || 'Failed to upload CSV')
+          }
+          result = await res.json()
+        } else {
+          result = await request(`/competitions/${selected}/recipients/bulk`, {
+            method: 'POST',
+            body: JSON.stringify({
+              recipients: csvRows.filter(r => !r.error).map(r => ({
+                display_name: r.name,
+                wallet_address: r.wallet,
+                eligibility_note: r.note
+              })),
+              auto_verify: csvAutoVerify,
+              reviewer: activeActor,
+              created_by: activeActor
+            })
+          })
+        }
+
+        setCsvSuccessMsg(`Successfully imported ${result.imported_count} recipient(s).${result.skipped_count > 0 ? ` ${result.skipped_count} row(s) skipped.` : ''}`)
+        if (result.errors && result.errors.length > 0) {
+          setCsvErrors(result.errors)
+        } else {
+          setCsvErrors([])
+        }
+        setCsvFile(null)
+        setCsvRows([])
+        if (fileInputRef.current) fileInputRef.current.value = ''
+        await loadAll()
+        notify(`Imported ${result.imported_count} recipients via CSV.`)
+      } finally {
+        setCsvImporting(false)
+      }
     })
   }
 
@@ -952,53 +1118,244 @@ function App({ initialView = null }) {
               <div className="panel-header">
                 <div>
                   <h2>Add Recipient Team</h2>
-                  <p>Register participating teams or generate a genuine Stellar testnet wallet with one click.</p>
+                  <p>Register individual teams or bulk import multiple recipients via CSV file.</p>
                 </div>
               </div>
 
-              <form onSubmit={addRecipient}>
-                <div className="form-group">
-                  <label>Team or Recipient Display Name</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Team Northstar"
-                    value={recipientName}
-                    onChange={e => setRecipientName(e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <label>Stellar Public Address (56-char ed25519 StrKey)</label>
-                    <button type="button" className="btn-secondary btn-sm" onClick={autoGenerateWallet} disabled={busy} style={{ fontSize: '11px', padding: '3px 8px' }}>
-                      Generate Testnet Wallet
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    placeholder="G..."
-                    value={wallet}
-                    onChange={e => setWallet(e.target.value)}
-                  />
-                  <span className="form-hint">Validates genuine ed25519 public keys format starting with 'G'.</span>
-                </div>
-
-                <div className="form-group">
-                  <label>Organizer Review Notes</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Verified eligibility criteria met"
-                    value={recipientNote}
-                    onChange={e => setRecipientNote(e.target.value)}
-                  />
-                </div>
-
-                <button className="btn-primary" type="submit" disabled={busy || !wallet.trim() || !recipientName.trim()}>
-                  Register Recipient
+              {/* Toggle Mode: Single vs CSV */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '18px', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
+                <button
+                  type="button"
+                  className={`btn-sm ${recipientMode === 'single' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => { setRecipientMode('single'); setCsvErrors([]); setCsvSuccessMsg(''); }}
+                  style={{ fontSize: '12px' }}
+                >
+                  Single Recipient Form
                 </button>
-              </form>
+                <button
+                  type="button"
+                  className={`btn-sm ${recipientMode === 'csv' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => { setRecipientMode('csv'); }}
+                  style={{ fontSize: '12px' }}
+                >
+                  Upload CSV File
+                </button>
+              </div>
+
+              {recipientMode === 'single' ? (
+                <form onSubmit={addRecipient}>
+                  <div className="form-group">
+                    <label>Team or Recipient Display Name</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Team Northstar"
+                      value={recipientName}
+                      onChange={e => setRecipientName(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label>Stellar Public Address (56-char ed25519 StrKey)</label>
+                      <button type="button" className="btn-secondary btn-sm" onClick={autoGenerateWallet} disabled={busy} style={{ fontSize: '11px', padding: '3px 8px' }}>
+                        Generate Testnet Wallet
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      placeholder="G..."
+                      value={wallet}
+                      onChange={e => setWallet(e.target.value)}
+                    />
+                    <span className="form-hint">Validates genuine ed25519 public keys format starting with 'G'.</span>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Organizer Review Notes</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Verified eligibility criteria met"
+                      value={recipientNote}
+                      onChange={e => setRecipientNote(e.target.value)}
+                    />
+                  </div>
+
+                  <button className="btn-primary" type="submit" disabled={busy || !wallet.trim() || !recipientName.trim()}>
+                    Register Recipient
+                  </button>
+                </form>
+              ) : (
+                <div>
+                  <div style={{ background: 'var(--bg-subtle)', padding: '12px 14px', borderRadius: 'var(--radius-sm)', marginBottom: '16px', fontSize: '13px', lineHeight: '1.5' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <strong>Bulk Import Recipients via CSV</strong>
+                      <button
+                        type="button"
+                        className="btn-secondary btn-sm"
+                        onClick={downloadSampleCsv}
+                        style={{ fontSize: '11px', padding: '3px 8px' }}
+                      >
+                        Download Sample CSV
+                      </button>
+                    </div>
+                    <p style={{ color: 'var(--text-muted)', marginTop: '6px', fontSize: '12px' }}>
+                      Upload a CSV file with columns: <span className="info-formula">name, wallet_address, notes</span>. Validates 56-character ed25519 StrKey public keys.
+                    </p>
+                  </div>
+
+                  <div
+                    className="csv-dropzone"
+                    style={{
+                      border: '2px dashed var(--border)',
+                      borderRadius: 'var(--radius-sm)',
+                      padding: '24px 16px',
+                      textAlign: 'center',
+                      background: csvFile ? 'rgba(46, 125, 50, 0.05)' : 'var(--bg-subtle)',
+                      cursor: 'pointer',
+                      marginBottom: '16px',
+                      transition: 'border-color 0.2s'
+                    }}
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={(e) => { e.preventDefault(); }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                        handleCsvFileSelect(e.dataTransfer.files[0]);
+                      }
+                    }}
+                  >
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept=".csv,text/csv"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleCsvFileSelect(e.target.files[0]);
+                        }
+                      }}
+                    />
+                    {csvFile ? (
+                      <div>
+                        <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--text)' }}>{csvFile.name}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                          {(csvFile.size / 1024).toFixed(1)} KB · {csvRows.length} rows detected
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-secondary btn-sm"
+                          style={{ marginTop: '10px', fontSize: '11px', padding: '3px 8px' }}
+                          onClick={(e) => { e.stopPropagation(); resetCsvUpload(); }}
+                        >
+                          Change File
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: '4px' }}>Click to select a CSV file or drag and drop</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Supports .csv files with name, wallet_address, notes</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {csvRows.length > 0 && (
+                    <div style={{ marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', fontSize: '12px' }}>
+                        <strong>File Preview ({csvRows.length} rows)</strong>
+                        <div>
+                          <span className="badge badge-green" style={{ marginRight: '6px' }}>
+                            {csvRows.filter(r => r.isValidStrKey).length} valid
+                          </span>
+                          {csvRows.filter(r => !r.isValidStrKey).length > 0 && (
+                            <span className="badge badge-red">
+                              {csvRows.filter(r => !r.isValidStrKey).length} invalid
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                        <table style={{ fontSize: '11px', width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ background: 'var(--bg-subtle)', textAlign: 'left' }}>
+                              <th style={{ padding: '6px 8px' }}>#</th>
+                              <th style={{ padding: '6px 8px' }}>Name</th>
+                              <th style={{ padding: '6px 8px' }}>Wallet</th>
+                              <th style={{ padding: '6px 8px' }}>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {csvRows.map((r, i) => (
+                              <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
+                                <td style={{ padding: '6px 8px' }}>{r.rowNum}</td>
+                                <td style={{ padding: '6px 8px' }}><strong>{r.name || '(empty)'}</strong></td>
+                                <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)' }}>{short(r.wallet)}</td>
+                                <td style={{ padding: '6px 8px' }}>
+                                  {r.error ? (
+                                    <span style={{ color: 'var(--danger)', fontSize: '10px' }}>{r.error}</span>
+                                  ) : (
+                                    <span className="badge badge-green" style={{ fontSize: '10px' }}>Ready</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="form-group" style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                      <input
+                        type="checkbox"
+                        checked={csvAutoVerify}
+                        onChange={(e) => setCsvAutoVerify(e.target.checked)}
+                      />
+                      <span>Automatically mark imported recipients as Verified</span>
+                    </label>
+                    <span className="form-hint">If unchecked, recipients will be imported as Pending review.</span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      disabled={busy || csvImporting || csvRows.filter(r => !r.error).length === 0}
+                      onClick={importCsvRecipients}
+                    >
+                      {csvImporting ? 'Importing...' : `Import ${csvRows.filter(r => !r.error).length} Recipients`}
+                    </button>
+                    {csvFile && (
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={resetCsvUpload}
+                        disabled={busy || csvImporting}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+
+                  {csvSuccessMsg && (
+                    <div style={{ marginTop: '12px', padding: '10px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 'var(--radius-sm)', color: '#166534', fontSize: '12px' }}>
+                      {csvSuccessMsg}
+                    </div>
+                  )}
+                  {csvErrors.length > 0 && (
+                    <div style={{ marginTop: '12px', padding: '10px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-sm)', color: '#991b1b', fontSize: '12px' }}>
+                      <strong>Import Warnings:</strong>
+                      <ul style={{ margin: '6px 0 0 16px', padding: 0 }}>
+                        {csvErrors.map((err, i) => (
+                          <li key={i}>Row {err.row}: {err.name || err.wallet} - {err.error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="panel">

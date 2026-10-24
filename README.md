@@ -196,6 +196,9 @@ The FastAPI backend exposes versioned, typed endpoints under `/api/v1`:
 | **Recipients** | `GET /api/v1/competitions/{id}/recipients` | List registered recipient teams and eligibility |
 | **Recipients** | `POST /api/v1/competitions/{id}/recipients` | Register candidate recipient with ed25519 wallet |
 | **Recipients** | `POST /api/v1/recipients/{id}/verify` | Verify recipient eligibility with review notes |
+| **Recipients** | `GET /api/v1/competitions/{id}/recipients/template.csv` | Download sample CSV template with valid keys |
+| **Recipients** | `POST /api/v1/competitions/{id}/recipients/bulk` | Bulk import recipients via JSON array |
+| **Recipients** | `POST /api/v1/competitions/{id}/recipients/upload-csv` | Upload CSV file to bulk import recipients |
 | **Policies** | `GET /api/v1/competitions/{id}/policies` | Retrieve active funding policies and versions |
 | **Policies** | `POST /api/v1/policies/simulate` | Simulate proportional release award calculations |
 | **Batches** | `POST /api/v1/competitions/{id}/batches` | Propose payout batch and compute SHA-256 hash |
