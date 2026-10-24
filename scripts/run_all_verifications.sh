@@ -8,36 +8,40 @@ echo "================================================================="
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+# 0. Zero Emoji Enterprise Styling Audit
+echo -e "\n[1/7] Verifying Zero Unicode Emojis Across Repository..."
+python3 "$ROOT_DIR/scripts/verify_no_emojis.py"
+
 # 1. Backend Linting
-echo -e "\n[1/6] Running Backend Ruff Linting..."
+echo -e "\n[2/7] Running Backend Ruff Linting..."
 cd "$ROOT_DIR/backend"
 ruff check app tests
 echo "[OK] Backend linting clean."
 
 # 2. Backend Automated Test Suite
-echo -e "\n[2/6] Running Backend Pytest Test Suite..."
+echo -e "\n[3/7] Running Backend Pytest Test Suite..."
 pytest -v
 echo "[OK] 25 backend tests passed."
 
 # 3. Performance & MeTTa Benchmark
-echo -e "\n[3/6] Running MeTTa & Invariants Benchmark..."
+echo -e "\n[4/7] Running MeTTa & Invariants Benchmark..."
 cd "$ROOT_DIR"
 python3 scripts/benchmark_engine.py
 echo "[OK] Performance benchmark verified."
 
 # 4. Frontend Vitest Suite
-echo -e "\n[4/6] Running Frontend Vitest Suite..."
+echo -e "\n[5/7] Running Frontend Vitest Suite..."
 cd "$ROOT_DIR/frontend"
 npm test
 echo "[OK] 13 frontend tests passed (12 unit + 1 E2E)."
 
 # 5. Frontend Production Build
-echo -e "\n[5/6] Building Production Frontend Bundle..."
+echo -e "\n[6/7] Building Production Frontend Bundle..."
 npm run build
 echo "[OK] Production bundle built successfully."
 
 # 6. End-to-End Live API Demo & Learning Loop
-echo -e "\n[6/6] Running Live API Demonstration & Learning Verification..."
+echo -e "\n[7/7] Running Live API Demonstration & Learning Verification..."
 if curl -s http://127.0.0.1:8000/api/v1/health >/dev/null 2>&1; then
   echo "Existing active API server detected on port 8000."
   cd "$ROOT_DIR"
