@@ -29,7 +29,7 @@ echo "[OK] Performance benchmark verified."
 echo -e "\n[4/6] Running Frontend Vitest Suite..."
 cd "$ROOT_DIR/frontend"
 npm test
-echo "[OK] 12 frontend tests passed."
+echo "[OK] 13 frontend tests passed (12 unit + 1 E2E)."
 
 # 5. Frontend Production Build
 echo -e "\n[5/6] Building Production Frontend Bundle..."

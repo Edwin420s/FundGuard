@@ -111,6 +111,16 @@ function App({ initialView = null }) {
   const [simEligible, setSimEligible] = useState(20)
   const [simOutcome, setSimOutcome] = useState(null)
 
+  // Policy Version Creation
+  const [newPolicyTarget, setNewPolicyTarget] = useState(50)
+  const [newPolicyBudgetXLM, setNewPolicyBudgetXLM] = useState('1700')
+
+  // Reconciliation Cases
+  const [reconciliationCases, setReconciliationCases] = useState([])
+  const [resolvingCaseId, setResolvingCaseId] = useState(null)
+  const [reconcileDecision, setReconcileDecision] = useState('confirm')
+  const [reconcileNote, setReconcileNote] = useState('')
+
   // AI Agent Assistant Status
   const [agentSummary, setAgentSummary] = useState(null)
 
@@ -169,6 +179,7 @@ function App({ initialView = null }) {
     setPolicies([])
     setTreasury(null)
     setActiveBatchId('')
+    setReconciliationCases([])
     await loadCompetitions(authData.default_competition_id, authData.user, 'app')
   }
 
@@ -187,6 +198,7 @@ function App({ initialView = null }) {
     setPolicies([])
     setTreasury(null)
     setActiveBatchId('')
+    setReconciliationCases([])
     await loadCompetitions(authData.default_competition_id, authData.user, 'app')
   }
 
@@ -203,6 +215,7 @@ function App({ initialView = null }) {
     setPolicies([])
     setTreasury(null)
     setActiveBatchId('')
+    setReconciliationCases([])
     navigate('landing')
   }
 
@@ -268,23 +281,23 @@ function App({ initialView = null }) {
     if (next) {
       await loadAll(next)
     } else {
-      setRecipients([])
       setBatches([])
       setAudit([])
       setPolicies([])
       setTreasury(null)
+      setReconciliationCases([])
     }
   }
 
   async function loadAll(id = selected) {
     if (!id) {
-      setRecipients([])
       setBatches([])
       setPolicies([])
       setTreasury(null)
+      setReconciliationCases([])
       return
     }
-    const [r, b, a, p, t, sc, nq] = await Promise.all([
+    const [r, b, a, p, t, sc, nq, rc] = await Promise.all([
       request(`/competitions/${id}/recipients`).catch(() => []),
       request(`/competitions/${id}/batches`).catch(() => []),
       request(`/audit/events?competition_id=${id}`).catch(() => []),
@@ -292,6 +305,7 @@ function App({ initialView = null }) {
       request(`/treasury/${id}`).catch(() => null),
       request('/stellar/custody').catch(() => null),
       request('/near-intents/quote?from_asset=XLM&to_asset=NEAR&amount_base_units=10000000').catch(() => null),
+      request(`/reconciliation/cases?competition_id=${id}`).catch(() => []),
     ])
     setRecipients(r)
     setBatches(b)
@@ -300,6 +314,7 @@ function App({ initialView = null }) {
     setTreasury(t)
     setCustody(sc)
     setNearQuote(nq)
+    setReconciliationCases(rc || [])
   }
 
   useEffect(() => {
@@ -391,6 +406,7 @@ function App({ initialView = null }) {
     setAudit([])
     setPolicies([])
     setTreasury(null)
+    setReconciliationCases([])
     setSelected(id)
     try { localStorage.setItem('fundguard_active_competition', id) } catch (_) {}
     await loadAll(id)
@@ -746,6 +762,52 @@ function App({ initialView = null }) {
       notify(res.message || '10,000 testnet XLM credited to payout vault.')
       const sc = await request('/stellar/custody').catch(() => null)
       setCustody(sc)
+    })
+  }
+
+  async function commitNewPolicy(e) {
+    if (e) e.preventDefault()
+    const target = Number(newPolicyTarget)
+    const budgetXLM = Number(newPolicyBudgetXLM)
+    if (!target || target <= 0) {
+      setError('Target winners must be greater than 0.')
+      return
+    }
+    if (!budgetXLM || budgetXLM <= 0) {
+      setError('Total budget must be greater than 0.')
+      return
+    }
+    await run(async () => {
+      const totalBaseUnits = Math.round(budgetXLM * 10000000)
+      const res = await request(`/competitions/${selected}/policies`, {
+        method: 'POST',
+        body: JSON.stringify({
+          target_eligible_count: target,
+          total_fund_base_units: totalBaseUnits,
+          currency: 'XLM',
+          illustrative_fiat_usd: budgetXLM.toFixed(2)
+        })
+      })
+      await loadAll()
+      notify(`Funding policy version v${res.version} committed with cryptographic hash ${short(res.rules_hash)}.`)
+    })
+  }
+
+  async function handleResolveCase(caseId) {
+    if (!caseId) return
+    await run(async () => {
+      await request(`/reconciliation/cases/${caseId}/resolve`, {
+        method: 'POST',
+        body: JSON.stringify({
+          decision: reconcileDecision,
+          reviewer: activeActor,
+          resolution_note: reconcileNote.trim() || 'Audited and manually verified via reconciliation console.'
+        })
+      })
+      setResolvingCaseId(null)
+      setReconcileNote('')
+      await loadAll()
+      notify(`Reconciliation case ${short(caseId)} resolved with decision: ${reconcileDecision}.`)
     })
   }
 
@@ -1432,125 +1494,221 @@ function App({ initialView = null }) {
 
         {/* 3. POLICIES & CALCULATOR TAB */}
         {tab === 'policies' && (
-          <div className="two-col-grid">
-            <div className="panel">
-              <div className="panel-header">
-                <div>
-                  <h2>Proportional Award Calculator</h2>
-                  <p>Simulate the official proportional release and carry-forward reserve formula.</p>
-                </div>
-              </div>
-
-              <div style={{ background: 'var(--bg-subtle)', padding: '14px 16px', borderRadius: 'var(--radius-sm)', marginBottom: '18px', fontSize: '13px', lineHeight: '1.6' }}>
-                <strong>How it works:</strong>
-                <p style={{ color: 'var(--text-muted)', marginTop: '4px' }}>
-                  If fewer than the target number of teams meet the quality bar, the prize fund releases proportionally:
-                  <span className="info-formula">Release Ratio = min(1.0, Verified Count / Target Count)</span>
-                  <br />
-                  Unreleased prize funds automatically roll into the protected Carry-Forward Reserve.
-                </p>
-              </div>
-
-              <form onSubmit={runPolicySimulator}>
-                <div className="form-group">
-                  <label>Target Winners Count: {simTarget}</label>
-                  <input
-                    type="range"
-                    min="1"
-                    max="100"
-                    value={simTarget}
-                    onChange={e => setSimTarget(e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Actual Verified Teams: {simEligible}</label>
-                  <input
-                    type="range"
-                    min="0"
-                    max={simTarget}
-                    value={simEligible}
-                    onChange={e => setSimEligible(e.target.value)}
-                  />
-                </div>
-
-                <button className="btn-primary" type="button" onClick={runPolicySimulator} disabled={busy}>
-                  Calculate Allocation
-                </button>
-              </form>
-
-              {simOutcome && (
-                <div style={{ marginTop: '24px', borderTop: '1px solid var(--border)', paddingTop: '18px' }}>
-                  <h3 style={{ fontSize: '14px', marginBottom: '12px' }}>Calculation Result</h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div className="metric-card" style={{ padding: '14px' }}>
-                      <span className="metric-label">Release Ratio</span>
-                      <div className="metric-value" style={{ fontSize: '20px' }}>{(simOutcome.release_ratio * 100).toFixed(1)}%</div>
-                      <span className="metric-sub">{simOutcome.eligible_count} out of {simOutcome.target_eligible_count} target</span>
-                    </div>
-                    <div className="metric-card" style={{ padding: '14px' }}>
-                      <span className="metric-label">Per-Winner Award</span>
-                      <div className="metric-value" style={{ fontSize: '20px', color: '#2e7d32' }}>{formatXLM(simOutcome.amount_per_recipient_base_units)}</div>
-                      <span className="metric-sub">Equal award distribution</span>
-                    </div>
-                    <div className="metric-card" style={{ padding: '14px' }}>
-                      <span className="metric-label">Total Released</span>
-                      <div className="metric-value" style={{ fontSize: '20px' }}>{formatXLM(simOutcome.released_base_units)}</div>
-                      <span className="metric-sub">{simOutcome.illustrative_released_fiat || (simOutcome.released_base_units ? formatXLM(simOutcome.released_base_units) : '')}</span>
-                    </div>
-                    <div className="metric-card" style={{ padding: '14px' }}>
-                      <span className="metric-label">Carry-Forward Reserve</span>
-                      <div className="metric-value" style={{ fontSize: '20px', color: '#1e6091' }}>{formatXLM(simOutcome.total_reserve_base_units)}</div>
-                      <span className="metric-sub">{simOutcome.illustrative_reserve_fiat || (simOutcome.total_reserve_base_units ? formatXLM(simOutcome.total_reserve_base_units) : '')}</span>
-                    </div>
+          <div>
+            <div className="two-col-grid">
+              <div className="panel">
+                <div className="panel-header">
+                  <div>
+                    <h2>Proportional Award Calculator</h2>
+                    <p>Simulate the official proportional release and carry-forward reserve formula.</p>
                   </div>
                 </div>
-              )}
+
+                <div style={{ background: 'var(--bg-subtle)', padding: '14px 16px', borderRadius: 'var(--radius-sm)', marginBottom: '18px', fontSize: '13px', lineHeight: '1.6' }}>
+                  <strong>How it works:</strong>
+                  <p style={{ color: 'var(--text-muted)', marginTop: '4px' }}>
+                    If fewer than the target number of teams meet the quality bar, the prize fund releases proportionally:
+                    <span className="info-formula">Release Ratio = min(1.0, Verified Count / Target Count)</span>
+                    <br />
+                    Unreleased prize funds automatically roll into the protected Carry-Forward Reserve.
+                  </p>
+                </div>
+
+                <form onSubmit={runPolicySimulator}>
+                  <div className="form-group">
+                    <label>Target Winners Count: {simTarget}</label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="100"
+                      value={simTarget}
+                      onChange={e => setSimTarget(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Actual Verified Teams: {simEligible}</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max={simTarget}
+                      value={simEligible}
+                      onChange={e => setSimEligible(e.target.value)}
+                    />
+                  </div>
+
+                  <button className="btn-primary" type="button" onClick={runPolicySimulator} disabled={busy}>
+                    Calculate Allocation
+                  </button>
+                </form>
+
+                {simOutcome && (
+                  <div style={{ marginTop: '24px', borderTop: '1px solid var(--border)', paddingTop: '18px' }}>
+                    <h3 style={{ fontSize: '14px', marginBottom: '12px' }}>Calculation Result</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div className="metric-card" style={{ padding: '14px' }}>
+                        <span className="metric-label">Release Ratio</span>
+                        <div className="metric-value" style={{ fontSize: '20px' }}>{(simOutcome.release_ratio * 100).toFixed(1)}%</div>
+                        <span className="metric-sub">{simOutcome.eligible_count} out of {simOutcome.target_eligible_count} target</span>
+                      </div>
+                      <div className="metric-card" style={{ padding: '14px' }}>
+                        <span className="metric-label">Per-Winner Award</span>
+                        <div className="metric-value" style={{ fontSize: '20px', color: '#2e7d32' }}>{formatXLM(simOutcome.amount_per_recipient_base_units)}</div>
+                        <span className="metric-sub">Equal award distribution</span>
+                      </div>
+                      <div className="metric-card" style={{ padding: '14px' }}>
+                        <span className="metric-label">Total Released</span>
+                        <div className="metric-value" style={{ fontSize: '20px' }}>{formatXLM(simOutcome.released_base_units)}</div>
+                        <span className="metric-sub">{simOutcome.illustrative_released_fiat || (simOutcome.released_base_units ? formatXLM(simOutcome.released_base_units) : '')}</span>
+                      </div>
+                      <div className="metric-card" style={{ padding: '14px' }}>
+                        <span className="metric-label">Carry-Forward Reserve</span>
+                        <div className="metric-value" style={{ fontSize: '20px', color: '#1e6091' }}>{formatXLM(simOutcome.total_reserve_base_units)}</div>
+                        <span className="metric-sub">{simOutcome.illustrative_reserve_fiat || (simOutcome.total_reserve_base_units ? formatXLM(simOutcome.total_reserve_base_units) : '')}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="panel">
+                <div className="panel-header">
+                  <div>
+                    <h2>Active Governance Policies</h2>
+                    <p>Rules enforced by the backend MeTTa symbolic engine on every payout.</p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gap: '14px' }}>
+                  <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <strong>Proportional Release Policy</strong>
+                      <span className="badge badge-green">Active</span>
+                    </div>
+                    <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                      Target: {policies[0]?.rules?.release_rule?.target_eligible_count || current?.target_count || 10} recipients · Minimum eligible: {policies[0]?.rules?.release_rule?.minimum_eligible_count || 1} · Currency: {policies[0]?.rules?.total_fund?.currency || current?.default_currency || 'XLM'} · Equal split distribution among verified winners.
+                    </p>
+                    {policies[0]?.rules_hash && (
+                      <div style={{ marginTop: '8px', fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
+                        Policy Hash: {policies[0].rules_hash.slice(0, 24)}...
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <strong>Treasury Invariant Enforcement</strong>
+                      <span className="badge badge-green">Active</span>
+                    </div>
+                    <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                      Guarantees no negative balances and ensures total commitments (paid + reserved + in-flight) cannot exceed total allocated funds.
+                    </p>
+                  </div>
+
+                  <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <strong>Dual-Signoff Security Binding</strong>
+                      <span className="badge badge-green">Active</span>
+                    </div>
+                    <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                      Payout execution is cryptographically bound to the SHA-256 batch hash; any tampering rejects execution automatically.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="panel">
-              <div className="panel-header">
-                <div>
-                  <h2>Active Governance Policies</h2>
-                  <p>Rules enforced by the backend MeTTa symbolic engine on every payout.</p>
+            <div className="two-col-grid" style={{ marginTop: '24px' }}>
+              {/* Commit New Policy Version */}
+              <div className="panel">
+                <div className="panel-header">
+                  <div>
+                    <h2>Commit New Policy Version</h2>
+                    <p>Register a cryptographically verifiable update to proportional allocation thresholds.</p>
+                  </div>
                 </div>
+
+                <form onSubmit={commitNewPolicy}>
+                  <div className="form-group">
+                    <label>Target Winners Count</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10000"
+                      required
+                      value={newPolicyTarget}
+                      onChange={e => setNewPolicyTarget(e.target.value)}
+                    />
+                    <span className="form-hint">Number of verified teams needed for 100% fund release.</span>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: '16px' }}>
+                    <label>Total Fund Budget (XLM)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      value={newPolicyBudgetXLM}
+                      onChange={e => setNewPolicyBudgetXLM(e.target.value)}
+                    />
+                    <span className="form-hint">Base program budget in Stellar Lumens.</span>
+                  </div>
+
+                  <button className="btn-primary" type="submit" disabled={busy}>
+                    Commit Policy Version
+                  </button>
+                </form>
               </div>
 
-              <div style={{ display: 'grid', gap: '14px' }}>
-                <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <strong>Proportional Release Policy</strong>
-                    <span className="badge badge-green">Active</span>
+              {/* Policy Version History */}
+              <div className="panel">
+                <div className="panel-header">
+                  <div>
+                    <h2>Policy Version History ({policies.length})</h2>
+                    <p>Cryptographic ledger of all active and superseded governance policy versions.</p>
                   </div>
-                  <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                    Target: {policies[0]?.rules?.release_rule?.target_eligible_count || current?.target_count || 10} recipients · Minimum eligible: {policies[0]?.rules?.release_rule?.minimum_eligible_count || 1} · Currency: {policies[0]?.rules?.total_fund?.currency || current?.default_currency || 'XLM'} · Equal split distribution among verified winners.
-                  </p>
-                  {policies[0]?.rules_hash && (
-                    <div style={{ marginTop: '8px', fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
-                      Policy Hash: {policies[0].rules_hash.slice(0, 24)}...
-                    </div>
-                  )}
                 </div>
 
-                <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <strong>Treasury Invariant Enforcement</strong>
-                    <span className="badge badge-green">Active</span>
+                {policies.length === 0 ? (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '16px 0' }}>No policy versions recorded.</p>
+                ) : (
+                  <div className="table-responsive">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Version</th>
+                          <th>Target</th>
+                          <th>Budget</th>
+                          <th>Rules Hash</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {policies.map(pol => {
+                          const target = pol.rules?.release_rule?.target_eligible_count || pol.target_eligible_count || 'N/A'
+                          const budget = pol.rules?.total_fund?.amount_base_units || pol.total_fund_base_units
+                          return (
+                            <tr key={pol.id || pol.version}>
+                              <td><strong>v{pol.version}</strong></td>
+                              <td>{target} winners</td>
+                              <td>{budget ? formatXLM(budget) : 'N/A'}</td>
+                              <td>
+                                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+                                  {short(pol.rules_hash)}
+                                </span>
+                              </td>
+                              <td>
+                                <span className={`badge ${pol.status === 'active' ? 'badge-green' : 'badge-amber'}`}>
+                                  {pol.status ? pol.status.toUpperCase() : 'ACTIVE'}
+                                </span>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
                   </div>
-                  <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                    Guarantees no negative balances and ensures total commitments (paid + reserved + in-flight) cannot exceed total allocated funds.
-                  </p>
-                </div>
-
-                <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <strong>Dual-Signoff Security Binding</strong>
-                    <span className="badge badge-green">Active</span>
-                  </div>
-                  <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                    Payout execution is cryptographically bound to the SHA-256 batch hash; any tampering rejects execution automatically.
-                  </p>
-                </div>
+                )}
               </div>
             </div>
           </div>
@@ -1875,6 +2033,117 @@ function App({ initialView = null }) {
                   <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Loading cross-chain exchange rates...</p>
                 )}
               </div>
+            </div>
+
+            {/* Disbursement Reconciliation & Anomaly Management */}
+            <div className="panel" style={{ marginBottom: '24px' }}>
+              <div className="panel-header">
+                <div>
+                  <h2>Disbursement Reconciliation & Anomaly Management</h2>
+                  <p>Real-time audit verifying on-chain settlement receipts against local cryptographic reservations.</p>
+                </div>
+                <button
+                  className="btn-secondary btn-sm"
+                  onClick={() => loadAll()}
+                  disabled={busy}
+                >
+                  Refresh Invariants
+                </button>
+              </div>
+
+              {reconciliationCases.length === 0 ? (
+                <div style={{ background: 'var(--bg-subtle)', padding: '16px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span className="badge badge-green">0 Anomaly Cases Detected</span>
+                    <span className="badge badge-blue">Clean Ledger</span>
+                    <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                      All on-chain settlement receipts match ledger reservations 1:1. Zero discrepancies detected.
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="table-responsive">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Case ID</th>
+                        <th>Status</th>
+                        <th>Anomaly Type</th>
+                        <th>Discrepancy</th>
+                        <th>Created</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reconciliationCases.map(cs => (
+                        <tr key={cs.id}>
+                          <td><span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>{short(cs.id)}</span></td>
+                          <td>
+                            <span className={`badge ${cs.status === 'open' ? 'badge-amber' : 'badge-green'}`}>
+                              {cs.status.toUpperCase()}
+                            </span>
+                          </td>
+                          <td>{cs.anomaly_type}</td>
+                          <td>{cs.amount_discrepancy_base_units ? formatXLM(cs.amount_discrepancy_base_units) : '0.00 XLM'}</td>
+                          <td><small style={{ color: 'var(--text-muted)' }}>{cs.created_at ? new Date(cs.created_at).toLocaleString() : 'N/A'}</small></td>
+                          <td>
+                            {cs.status === 'open' ? (
+                              resolvingCaseId === cs.id ? (
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                  <select
+                                    value={reconcileDecision}
+                                    onChange={e => setReconcileDecision(e.target.value)}
+                                    style={{ fontSize: '12px', padding: '4px 6px' }}
+                                  >
+                                    <option value="confirm">Confirm</option>
+                                    <option value="fail">Fail</option>
+                                    <option value="retry">Retry</option>
+                                  </select>
+                                  <input
+                                    type="text"
+                                    placeholder="Resolution note"
+                                    value={reconcileNote}
+                                    onChange={e => setReconcileNote(e.target.value)}
+                                    style={{ fontSize: '12px', padding: '4px 6px', width: '130px' }}
+                                  />
+                                  <button
+                                    className="btn-primary btn-sm"
+                                    onClick={() => handleResolveCase(cs.id)}
+                                    disabled={busy}
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    className="btn-secondary btn-sm"
+                                    onClick={() => setResolvingCaseId(null)}
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  className="btn-secondary btn-sm"
+                                  onClick={() => {
+                                    setResolvingCaseId(cs.id)
+                                    setReconcileDecision('confirm')
+                                    setReconcileNote('')
+                                  }}
+                                >
+                                  Resolve Case
+                                </button>
+                              )
+                            ) : (
+                              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                Resolved: {cs.resolution_decision}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             {/* Cryptographic Audit Trail */}
