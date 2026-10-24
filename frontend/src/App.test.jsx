@@ -84,7 +84,7 @@ describe('FundGuard Dashboard UI', () => {
     render(<App />)
     const policyTabBtn = screen.getByRole('button', { name: /Award Rules & Calculator/i })
     fireEvent.click(policyTabBtn)
-    expect(screen.getByRole('heading', { name: /Track 02 Proportional Award Calculator/i })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: /Proportional Award Calculator/i })).toBeTruthy()
     expect(screen.getByRole('heading', { name: /Active Governance Policies/i })).toBeTruthy()
   })
 

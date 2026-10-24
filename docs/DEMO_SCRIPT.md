@@ -1,4 +1,4 @@
-# Three-minute buildathon demo script
+# Executive Product Walkthrough Script
 
 ## Before recording
 - Start API and frontend.

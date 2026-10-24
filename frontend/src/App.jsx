@@ -77,8 +77,8 @@ function App({ initialView = null }) {
   const [mode, setMode] = useState('stellar-testnet') // 'stellar-testnet' or 'simulated'
 
   // Workspace Creation Form
-  const [compName, setCompName] = useState('Hackathon Prize Distribution')
-  const [compDescription, setCompDescription] = useState('Automated, human-approved payouts to verified winners.')
+  const [compName, setCompName] = useState('Prize Distribution Workspace')
+  const [compDescription, setCompDescription] = useState('Automated, human-approved payouts to verified recipients.')
 
   // Recipient Form
   const [recipientName, setRecipientName] = useState('')
@@ -706,11 +706,11 @@ function App({ initialView = null }) {
             </h1>
             <p className="topbar-subtitle">
               {tab === 'overview' && 'Real-time overview of fund allocations, recipient status, and on-chain deliveries.'}
-              {tab === 'recipients' && 'Manage participating teams, verify competition eligibility, and review reliability scores.'}
-              {tab === 'policies' && 'Track 02 proportional award calculator and reserve rollover rules.'}
+              {tab === 'recipients' && 'Manage participating teams, verify program eligibility, and review reliability scores.'}
+              {tab === 'policies' && 'Proportional award calculator and reserve rollover rules.'}
               {tab === 'batches' && 'Review AI-generated payout drafts, verify cryptographic fingerprints, and execute settlements.'}
               {tab === 'treasury' && 'Cryptographically verifiable ledger tracking fund balances, reserve carry-forward, and audit proofs.'}
-              {tab === 'setup' && 'Switch between previous hackathon workspaces or create a new isolated workspace.'}
+              {tab === 'setup' && 'Switch between previous program workspaces or create a new isolated workspace.'}
             </p>
           </div>
 
@@ -989,7 +989,7 @@ function App({ initialView = null }) {
                   <label>Organizer Review Notes</label>
                   <input
                     type="text"
-                    placeholder="e.g. Completed hackathon demo presentation"
+                    placeholder="e.g. Verified eligibility criteria met"
                     value={recipientNote}
                     onChange={e => setRecipientNote(e.target.value)}
                   />
@@ -1064,7 +1064,7 @@ function App({ initialView = null }) {
             <div className="panel">
               <div className="panel-header">
                 <div>
-                  <h2>Track 02 Proportional Award Calculator</h2>
+                  <h2>Proportional Award Calculator</h2>
                   <p>Simulate the official proportional release and carry-forward reserve formula.</p>
                 </div>
               </div>
@@ -1561,7 +1561,7 @@ function App({ initialView = null }) {
               <div className="panel-header">
                 <div>
                   <h2>Existing Workspaces ({competitions.length})</h2>
-                  <p>All active hackathon workspaces currently stored. Click to switch workspace.</p>
+                  <p>All active program workspaces currently stored. Click to switch workspace.</p>
                 </div>
               </div>
 
@@ -1623,11 +1623,11 @@ function App({ initialView = null }) {
 
               <form onSubmit={createWorkspace}>
                 <div className="form-group">
-                  <label>Competition or Hackathon Name</label>
+                  <label>Program or Workspace Name</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. AI Agents Lisbon Buildathon"
+                    placeholder="e.g. AI Agents Ecosystem Grants"
                     value={compName}
                     onChange={e => setCompName(e.target.value)}
                   />
@@ -1637,7 +1637,7 @@ function App({ initialView = null }) {
                   <label>Description and Purpose</label>
                   <textarea
                     rows={3}
-                    placeholder="e.g. Transparent distribution of Track 02 prize funds to verified teams."
+                    placeholder="e.g. Transparent distribution of prize or grant funds to verified teams."
                     value={compDescription}
                     onChange={e => setCompDescription(e.target.value)}
                   />

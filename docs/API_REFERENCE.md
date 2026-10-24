@@ -16,7 +16,7 @@ Base path: `/api/v1`. OpenAPI Interactive UI: `/docs`. JSON responses.
 - `GET /organizations` — List all registered organizations.
 - `POST /organizations` — Register a tenant organization.
   ```json
-  {"name": "BASIX AI Lisbon Org", "slug": "basix-lisbon"}
+  {"name": "Global Innovation Foundation", "slug": "global-innovation"}
   ```
 
 ---
@@ -27,8 +27,8 @@ Base path: `/api/v1`. OpenAPI Interactive UI: `/docs`. JSON responses.
 - `POST /competitions` — Create competition workspace.
   ```json
   {
-    "name": "BASIX AI Omega Lisbon Buildathon",
-    "description": "Track 02 - Omega Payouts",
+    "name": "Global Tech Grant Fund",
+    "description": "Enterprise prize distribution and grant management",
     "network": "stellar-testnet"
   }
   ```
@@ -75,7 +75,7 @@ Base path: `/api/v1`. OpenAPI Interactive UI: `/docs`. JSON responses.
     "display_name": "Team Northstar",
     "wallet_address": "GBZXN7PIRZGNMHGA728R420SFUNDGUARDDEMO1234567890ABCDEF12345678",
     "eligibility_status": "pending",
-    "eligibility_note": "Winner Track 02"
+    "eligibility_note": "Verified Grant Winner"
   }
   ```
 - `POST /competitions/{competition_id}/recipients/{recipient_id}/verify` — Organizer review and eligibility verification.

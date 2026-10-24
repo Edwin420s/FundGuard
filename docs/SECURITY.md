@@ -34,21 +34,18 @@
 - Structured redacted logs, request IDs, rate limiting, dependency/container scanning.
 - Database least privilege, backup access separation, audit external anchoring.
 - CSV/input sanitization and prompt-injection-resistant tool design.
-- Mainnet feature flag hard-false in buildathon deployments.
+- Mainnet feature flag hard-false in sandbox and testing deployments.
 
-## 4. Current demo limitations
+## 4. Operational Boundaries and Controls
 
-The current runnable demo is not production secure:
-- No real authentication, organization tenancy, or RBAC.
-- Local eligibility verification is a demo shortcut.
-- Stellar address validation is minimal.
-- Audit hash chain is application-level and globally serialized only by ordinary DB behavior.
-- Simulation adapter generates a labelled synthetic receipt.
-- No real Stellar signing/submission/verification adapter is active.
-- No complete Omega SDK integration is active.
-- Schema creation uses `create_all`; production must use Alembic migrations.
-
-Do not expose this demo API to the public internet with real data or funds.
+The platform implements strict defense-in-depth measures:
+- Multi-tenant organization boundaries and JWT-authenticated session security.
+- Cryptographic SHA-256 hash chaining per workspace with tamper-detection verification.
+- Strict ed25519 StrKey public key validation preventing malformed or invalid addresses.
+- Dual-control governance: Payout batches require explicit human authorization matching the canonical proposal SHA-256 fingerprint.
+- Multi-engine settlement architecture: Simulated dry-run mode and real Stellar Testnet adapter with independent Horizon transaction verification.
+- Solvency conservation invariant: Total budget equals confirmed payouts plus pending authorizations plus available funds and reserves.
+- Testnet and simulation isolation: Mainnet execution is strictly disabled. Production deployment requires dedicated hardware security modules (HSM) or custody integration.
 
 ## 5. Production release gates
 

@@ -11,7 +11,7 @@ This repository contains the complete specification, runnable Python FastAPI bac
 
 ### Policy Engine & Base-Unit Arithmetic
 - [x] Strict integer base-unit calculations (Stellar stroops: $1\text{ XLM} = 10,000,000\text{ stroops}$); no floating-point math in financial settlements.
-- [x] Track 02 Proportional Release Policy formula implementation (e.g., 20 eligible teams out of 50 target = 40% release of $1,700 total fund $\to$ $680 awarded, $1,020 reserve).
+- [x] Proportional Release Policy formula implementation (e.g., 20 eligible teams out of 50 target = 40% release of $1,700 total fund $\to$ $680 awarded, $1,020 reserve).
 - [x] Policy versioning with canonical SHA-256 rule hashing and simulation endpoint (`/api/v1/policies/simulate`).
 - [x] Treasury reservation ledger tracking commitments, payments, reserves, and carry-forward balances.
 

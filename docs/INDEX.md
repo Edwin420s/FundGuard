@@ -12,7 +12,7 @@ Read in this order:
 8. [`OPERATIONS.md`](OPERATIONS.md) — local run, deployment, backups, monitoring, recovery, and incident handling.
 9. [`OMEGA_AGENT.md`](OMEGA_AGENT.md) — agent responsibilities, tool contract, memory boundaries, and evaluation.
 10. [`STELLAR_INTEGRATION.md`](STELLAR_INTEGRATION.md) — safe integration requirements for testnet and evidence verification.
-11. [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md) — a reliable three-minute buildathon demonstration.
+11. [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md) — an executive product demonstration walkthrough.
 12. [`DECISIONS.md`](DECISIONS.md) — architectural decisions and rationale.
 
 ## Status convention

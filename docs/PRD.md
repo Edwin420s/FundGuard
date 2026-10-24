@@ -1,10 +1,10 @@
 # Product Requirements Document — Omega FundGuard
 
-**Version:** 1.1 · **Primary user:** hackathon organizers · **Initial settlement target:** Stellar testnet
+**Version:** 1.1 · **Primary users:** Program Directors, Grant Managers, Treasury Leads, Prize Fund Organizers · **Settlement target:** Stellar Network
 
 ## 1. Summary
 
-Omega FundGuard coordinates funding rules, recipient eligibility, payout allocation, human approval, settlement, receipt verification, reconciliation, and audit reporting. It targets hackathons first and can extend to accelerators, grant programs, fellowships, community treasuries, and prize competitions.
+Omega FundGuard coordinates funding rules, recipient eligibility, payout allocation, human approval, settlement, receipt verification, reconciliation, and audit reporting across enterprise grant programs, accelerators, community treasuries, fellowships, and competitive prize distributions.
 
 Omega provides context retrieval and workflow orchestration. Deterministic services remain authoritative for eligibility state, amount arithmetic, policy enforcement, permissions, idempotency, approvals, and settlement state. The agent cannot sign transactions or mark payments confirmed.
 

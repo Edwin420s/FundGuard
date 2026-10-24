@@ -25,5 +25,5 @@
 **Reason:** SDK APIs evolve and must be pinned/verified rather than guessed.
 
 ## ADR-007 — Testnet first, mainnet disabled
-**Decision:** buildathon uses testnet design and simulation; mainnet remains disabled.  
-**Reason:** financial, security, legal, and operational gates must be met before live money.
+**Decision:** Platform defaults to testnet settlement and dry-run simulation; live mainnet execution remains strictly disabled without explicit operational and security approvals.  
+**Reason:** financial, security, legal, and operational gates must be met before live money disbursements.

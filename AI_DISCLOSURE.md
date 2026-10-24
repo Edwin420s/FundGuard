@@ -1,8 +1,7 @@
 # AI Transparency & Architectural Assurance — Omega FundGuard
 
 > **Enterprise AI Transparency & Architectural Assurance**  
-> **Product:** Omega FundGuard — Auditable Payout Operations  
-> **Hackathon Track:** BASIX AI Omega Dev Buildathon (Lisbon, Track 02 — Omega payouts)  
+> **Product:** Omega FundGuard — Autonomous Payout & Treasury Governance Infrastructure  
 > **Engineering Lead:** Edwin Mwiti  
 
 ---

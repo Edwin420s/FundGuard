@@ -79,5 +79,5 @@ The React dashboard includes a dedicated **Stellar Testnet Console** view and to
 - **Settlement Mode Toggle:** Seamlessly toggle between `Simulated Mode` (offline testing) and `Stellar Testnet` (live Horizon operations).
 - **Custody Keypair Card:** Live display of custody public key, sequence, subentries, and live XLM/stroops balance.
 - **Friendbot Quick Top-Up:** 1-click button to fund the custody account with 10,000 testnet XLM.
-- **Auto-Generate Testnet Recipient:** 1-click generation and funding of genuine StrKey testnet accounts for hackathon teams.
+- **Auto-Generate Testnet Recipient:** 1-click generation and funding of genuine StrKey testnet accounts for candidate recipients and winners.
 - **Horizon Transaction Inspector:** Paste any transaction hash, destination, and amount to trigger an on-chain verification check with direct link to `stellar.expert`.

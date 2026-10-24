@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Alembic Database Migrations**: Added full schema migration `f2c511826601_initial_full_schema.py` and closed-loop learning migration `bcaa6af974a2_add_learning_and_reliability_tables.py`.
 - **MeTTa Symbolic Cognitive Architecture**:
   - `metta/ontology/types.metta`: Formal typed atomspace for competitions, policies, recipients, and hashes.
-  - `metta/rules/proportional_release.metta`: Track 02 proportional release formula (e.g. 20 eligible / 50 target = 40% release), winner share allocation, and carry-forward reserves.
+  - `metta/rules/proportional_release.metta`: Proportional release formula (e.g. 20 eligible / 50 target = 40% release), winner share allocation, and carry-forward reserves.
   - `metta/rules/eligibility.metta`: Recipient verification and duplicate wallet detection.
   - `metta/rules/accounting_invariants.metta`: Financial conservation laws ($\text{Total} = \text{Paid} + \text{Reserved} + \text{Available}$).
   - `metta/rules/prompt_injection_defense.metta`: Symbolic containment of adversarial prompt injections.

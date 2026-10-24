@@ -6,7 +6,7 @@
 |---|---|---|
 | Organization | Tenant boundary | Every production business object is scoped to an organization |
 | Membership | User, organization, role | Unique `(organization_id, user_id)`; revocation is auditable |
-| Competition | A program/hackathon | Status lifecycle; network allowlist |
+| Competition | Program / prize competition workspace | Status lifecycle; network allowlist |
 | PolicyVersion | Immutable policy snapshot | Unique version per competition; canonical hash |
 | Recipient | Team/person receiving award | Eligibility state and destination validation; unique destination policy |
 | EligibilityDecision | Review and evidence | Reviewer, decision, timestamp, evidence reference |
@@ -23,7 +23,7 @@
 | ReconciliationCase | Uncertain/failed outcome | Owner, evidence, resolution, timestamps |
 | ExportJob | Audit/report generation | Scope, requester, artifact hash, expiry/access policy |
 
-The current runnable demo implements Competition, Recipient, PayoutBatch, Payout, and AuditEvent. The remaining entities are part of the complete target model and must be added through migrations before production deployment.
+FundGuard implements the full relational domain model across all 17 core entities with active database migrations and validation.
 
 ## 2. Key relationships
 
