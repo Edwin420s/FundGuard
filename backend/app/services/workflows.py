@@ -394,19 +394,20 @@ def audit_chain(db: Session, competition_id: str = None):
         q = q.filter_by(competition_id=competition_id)
     events = q.order_by(AuditEvent.created_at.asc(), AuditEvent.id.asc()).all()
     results = []
-    previous = None
+    previous_by_comp: dict[str | None, str | None] = {}
     for event in events:
+        expected_prev = previous_by_comp.get(event.competition_id)
         body = {"competition_id": event.competition_id, "entity_type": event.entity_type,
                 "entity_id": event.entity_id, "action": event.action, "actor": event.actor,
                 "correlation_id": event.correlation_id, "details": json.loads(event.details_json),
                 "previous_event_hash": event.previous_event_hash}
         expected = hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-        valid = expected == event.event_hash and event.previous_event_hash == previous
+        valid = (expected == event.event_hash) and (event.previous_event_hash == expected_prev)
         results.append({"id": event.id, "competition_id": event.competition_id,
                         "action": event.action, "entity_type": event.entity_type,
                         "entity_id": event.entity_id, "actor": event.actor, "correlation_id": event.correlation_id,
                         "created_at": event.created_at.isoformat(), "event_hash": event.event_hash,
                         "previous_event_hash": event.previous_event_hash, "integrity_valid": valid,
                         "details": json.loads(event.details_json)})
-        previous = event.event_hash
+        previous_by_comp[event.competition_id] = event.event_hash
     return results
