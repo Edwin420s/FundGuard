@@ -53,7 +53,7 @@ def create_organization(db: Session, payload):
     db.refresh(org)
     return org
 
-def create_competition(db: Session, payload, organization_id: str = "org-basix-global"):
+def create_competition(db: Session, payload, organization_id: str = "org-fundguard-global"):
     row = Competition(name=payload.name, description=payload.description,
                       network=payload.network, organization_id=organization_id,
                       default_currency=payload.default_currency)

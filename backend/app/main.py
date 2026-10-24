@@ -11,7 +11,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title=settings.app_name,
     version="1.0.0",
-    description="Omega FundGuard — AI-Agent-Coordinated, Human-Approved, Auditable Payout Platform for Hackathons and Competitions."
+    description="FundGuard — Autonomous, Human-Approved Payout & Treasury Governance Platform."
 )
 
 origins = [x.strip() for x in settings.cors_origins.split(",") if x.strip()]

@@ -29,7 +29,7 @@ class OmegaAgentOrchestrator:
         # Check prompt injection guard via MeTTa rule
         if "ignore all rules" in prompt.lower() or "bypass" in prompt.lower():
             run = AgentRun(
-                organization_id="org-basix-global",
+                organization_id="org-fundguard-global",
                 competition_id=competition_id,
                 intent=intent,
                 prompt=prompt,
@@ -129,7 +129,7 @@ class OmegaAgentOrchestrator:
 
         # Persist AgentRun and AgentToolCall records
         run = AgentRun(
-            organization_id="org-basix-global",
+            organization_id="org-fundguard-global",
             competition_id=competition_id,
             intent=intent,
             prompt=prompt,

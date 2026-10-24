@@ -77,13 +77,13 @@ function App({ initialView = null }) {
   const [mode, setMode] = useState('stellar-testnet') // 'stellar-testnet' or 'simulated'
 
   // Workspace Creation Form
-  const [compName, setCompName] = useState('Prize Distribution Workspace')
-  const [compDescription, setCompDescription] = useState('Automated, human-approved payouts to verified recipients.')
+  const [compName, setCompName] = useState('')
+  const [compDescription, setCompDescription] = useState('')
 
   // Recipient Form
   const [recipientName, setRecipientName] = useState('')
   const [wallet, setWallet] = useState('')
-  const [recipientNote, setRecipientNote] = useState('Track winner submission verified by organizer')
+  const [recipientNote, setRecipientNote] = useState('')
 
   // Recipient CSV Upload State
   const [recipientMode, setRecipientMode] = useState('single') // 'single' | 'csv'
@@ -97,14 +97,14 @@ function App({ initialView = null }) {
 
   // Manual Batch Creation Form (amounts in XLM)
   const [selectedRecipients, setSelectedRecipients] = useState([])
-  const [amountXLM, setAmountXLM] = useState('50')
+  const [amountXLM, setAmountXLM] = useState('')
   const [reserveXLM, setReserveXLM] = useState('0')
   const [activeBatchId, setActiveBatchId] = useState('')
-  const [approverName, setApproverName] = useState('Finance Director')
+  const [approverName, setApproverName] = useState('')
   const [showAdvancedReserve, setShowAdvancedReserve] = useState(false)
 
-  const activeActor = (view === 'app' && currentUser) ? (currentUser.full_name || currentUser.email) : 'Demo Administrator'
-  const activeApprover = (view === 'app' && currentUser) ? (currentUser.full_name || currentUser.email) : (approverName || 'Demo Administrator')
+  const activeActor = (view === 'app' && currentUser) ? (currentUser.full_name || currentUser.email) : 'Administrator'
+  const activeApprover = (view === 'app' && currentUser) ? (currentUser.full_name || currentUser.email) : (approverName || 'Administrator')
 
   // Policy Simulator
   const [simTarget, setSimTarget] = useState(50)
@@ -228,14 +228,14 @@ function App({ initialView = null }) {
         return
       }
     } else if (activeView === 'demo') {
-      orgParam = '?organization_id=org-basix-global'
+      orgParam = '?organization_id=org-fundguard-global'
     }
 
     let list = await request(`/competitions${orgParam}`).catch(() => [])
 
     if (list.length === 0 && activeView === 'demo') {
       const allComps = await request('/competitions').catch(() => [])
-      list = allComps.filter(c => c.organization_id === 'org-basix-global' || !c.organization_id)
+      list = allComps.filter(c => c.organization_id === 'org-fundguard-global' || !c.organization_id)
       if (list.length === 0) list = allComps
     }
 
@@ -314,6 +314,16 @@ function App({ initialView = null }) {
     }
   }, [selected, view])
 
+  useEffect(() => {
+    if (policies && policies.length > 0) {
+      const p = policies[0]
+      const target = p.rules?.release_rule?.target_eligible_count || p.target_eligible_count
+      if (target) {
+        setSimTarget(target)
+      }
+    }
+  }, [policies])
+
   const current = competitions.find(c => c.id === selected)
   const verifiedRecipients = useMemo(() => recipients.filter(r => r.eligibility_status === 'verified'), [recipients])
   const activeBatch = useMemo(() => batches.find(b => b.id === activeBatchId) || batches[0], [batches, activeBatchId])
@@ -354,7 +364,7 @@ function App({ initialView = null }) {
     e.preventDefault()
     if (!compName.trim()) return
     await run(async () => {
-      const orgId = view === 'app' && currentUser?.organization_id ? currentUser.organization_id : 'org-basix-global'
+      const orgId = view === 'app' && currentUser?.organization_id ? currentUser.organization_id : 'org-fundguard-global'
       const c = await request('/competitions', {
         method: 'POST',
         body: JSON.stringify({
@@ -366,6 +376,8 @@ function App({ initialView = null }) {
         })
       })
       await loadCompetitions(c.id, currentUser, view)
+      setCompName('')
+      setCompDescription('')
       setTab('overview')
       notify(`Workspace "${compName}" created. You can switch between all workspaces at any time.`)
     })
@@ -599,8 +611,9 @@ function App({ initialView = null }) {
 
       // 2. Automatically create the batch proposal with calculated proportional allocation
       const key = crypto.randomUUID()
-      const totalBudgetStroops = 17000000000 // 1,700 XLM standard budget
-      const targetCount = 50
+      const activePolicy = policies.length > 0 ? policies[0] : null
+      const totalBudgetStroops = activePolicy?.rules?.total_fund?.amount_base_units || activePolicy?.total_fund_base_units || treasury?.total_fund_base_units || 10000000000
+      const targetCount = activePolicy?.rules?.release_rule?.target_eligible_count || activePolicy?.target_eligible_count || 10
       const eligibleCount = verifiedRecipients.length
       const releaseRatio = Math.min(1.0, eligibleCount / targetCount)
       const releasedTotalStroops = Math.round(totalBudgetStroops * releaseRatio)
@@ -713,12 +726,14 @@ function App({ initialView = null }) {
   async function runPolicySimulator(e) {
     if (e) e.preventDefault()
     await run(async () => {
+      const activePolicy = policies.length > 0 ? policies[0] : null
+      const budgetBaseUnits = activePolicy?.rules?.total_fund?.amount_base_units || activePolicy?.total_fund_base_units || treasury?.total_fund_base_units || 10000000000
       const res = await request(`/competitions/${selected}/policies/simulate`, {
         method: 'POST',
         body: JSON.stringify({
           target_eligible_count: Number(simTarget),
           eligible_count: Number(simEligible),
-          total_fund_base_units: 17000000000
+          total_fund_base_units: budgetBaseUnits
         })
       })
       setSimOutcome(res.calculated_outcome)
@@ -1481,12 +1496,12 @@ function App({ initialView = null }) {
                     <div className="metric-card" style={{ padding: '14px' }}>
                       <span className="metric-label">Total Released</span>
                       <div className="metric-value" style={{ fontSize: '20px' }}>{formatXLM(simOutcome.released_base_units)}</div>
-                      <span className="metric-sub">{simOutcome.illustrative_released_fiat || '$680.00'}</span>
+                      <span className="metric-sub">{simOutcome.illustrative_released_fiat || (simOutcome.released_base_units ? formatXLM(simOutcome.released_base_units) : '')}</span>
                     </div>
                     <div className="metric-card" style={{ padding: '14px' }}>
                       <span className="metric-label">Carry-Forward Reserve</span>
                       <div className="metric-value" style={{ fontSize: '20px', color: '#1e6091' }}>{formatXLM(simOutcome.total_reserve_base_units)}</div>
-                      <span className="metric-sub">{simOutcome.illustrative_reserve_fiat || '$1020.00'}</span>
+                      <span className="metric-sub">{simOutcome.illustrative_reserve_fiat || (simOutcome.total_reserve_base_units ? formatXLM(simOutcome.total_reserve_base_units) : '')}</span>
                     </div>
                   </div>
                 </div>
@@ -1508,8 +1523,13 @@ function App({ initialView = null }) {
                     <span className="badge badge-green">Active</span>
                   </div>
                   <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                    Target: 50 teams · Minimum eligible: 1 team · Base currency: XLM · Equal split distribution among verified winners.
+                    Target: {policies[0]?.rules?.release_rule?.target_eligible_count || current?.target_count || 10} recipients · Minimum eligible: {policies[0]?.rules?.release_rule?.minimum_eligible_count || 1} · Currency: {policies[0]?.rules?.total_fund?.currency || current?.default_currency || 'XLM'} · Equal split distribution among verified winners.
                   </p>
+                  {policies[0]?.rules_hash && (
+                    <div style={{ marginTop: '8px', fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
+                      Policy Hash: {policies[0].rules_hash.slice(0, 24)}...
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '16px' }}>

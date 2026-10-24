@@ -291,10 +291,10 @@ class StellarTestnetService:
                 pass
 
         # Simulated execution fallback
-        mock_hash = hashlib.sha256(f"{uuid4()}:{destination}:{amount_base_units}:{time.time()}".encode()).hexdigest()
+        sim_hash = hashlib.sha256(f"{uuid4()}:{destination}:{amount_base_units}:{time.time()}".encode()).hexdigest()
         return {
             "status": "simulated",
-            "tx_hash": f"STELLAR-TESTNET-SIM-{mock_hash[:32]}",
+            "tx_hash": f"STELLAR-TESTNET-SIM-{sim_hash[:32]}",
             "ledger": 1284567,
             "receipt": {
                 "kind": "SIMULATED_NOT_ON_CHAIN",
@@ -306,7 +306,7 @@ class StellarTestnetService:
                 "source_account": kp.public_key,
                 "created_at": datetime.datetime.now(datetime.UTC).isoformat(),
                 "verification": "strkey_validated_simulation",
-                "explorer_url": f"https://stellar.expert/explorer/testnet/tx/{mock_hash[:32]}"
+                "explorer_url": f"https://stellar.expert/explorer/testnet/tx/{sim_hash[:32]}"
             }
         }
 

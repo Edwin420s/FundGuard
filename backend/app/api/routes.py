@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.agent.evaluator import AgentEvaluator
 from app.agent.metta_engine import MeTTAEngine
 from app.agent.orchestrator import OmegaAgentOrchestrator
+from app.config import settings
 from app.database import get_db
 from app.models import (
     Competition,
@@ -97,7 +98,11 @@ def list_organizations(db: Session = Depends(get_db)):
     rows = db.query(Organization).all()
     if not rows:
         # Default org fallback
-        default_org = Organization(id="org-basix-global", name="BASIX Market Hackathons", slug="basix-market")
+        default_org = Organization(
+            id=settings.default_organization_id,
+            name=settings.default_organization_name,
+            slug="fundguard-global"
+        )
         db.add(default_org)
         db.commit()
         db.refresh(default_org)
@@ -123,7 +128,7 @@ def list_competitions(organization_id: str | None = None, db: Session = Depends(
 
 @router.post("/competitions", status_code=201)
 def post_competition(payload: CompetitionCreate, db: Session = Depends(get_db)):
-    org_id = payload.organization_id or "org-basix-global"
+    org_id = payload.organization_id or settings.default_organization_id
     row = create_competition(db, payload, organization_id=org_id)
     return {"id": row.id, "name": row.name, "description": row.description, "status": row.status,
              "network": row.network, "default_currency": row.default_currency,

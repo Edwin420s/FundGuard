@@ -47,7 +47,7 @@ class UserAccount(Base):
 class Competition(Base):
     __tablename__ = "competitions"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
-    organization_id: Mapped[str] = mapped_column(String(36), default="org-basix-global", nullable=False, index=True)
+    organization_id: Mapped[str] = mapped_column(String(36), default="org-fundguard-global", nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     description: Mapped[str] = mapped_column(Text, default="", nullable=False)
     status: Mapped[str] = mapped_column(String(24), default="active", nullable=False)
@@ -61,7 +61,7 @@ class Competition(Base):
 class FundingPolicyVersion(Base):
     __tablename__ = "funding_policy_versions"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
-    organization_id: Mapped[str] = mapped_column(String(36), default="org-basix-global", nullable=False, index=True)
+    organization_id: Mapped[str] = mapped_column(String(36), default="org-fundguard-global", nullable=False, index=True)
     competition_id: Mapped[str] = mapped_column(ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True)
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     status: Mapped[str] = mapped_column(String(24), default="active", nullable=False)
@@ -75,7 +75,7 @@ class FundingPolicyVersion(Base):
 class Recipient(Base):
     __tablename__ = "recipients"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
-    organization_id: Mapped[str] = mapped_column(String(36), default="org-basix-global", nullable=False, index=True)
+    organization_id: Mapped[str] = mapped_column(String(36), default="org-fundguard-global", nullable=False, index=True)
     competition_id: Mapped[str] = mapped_column(ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True)
     display_name: Mapped[str] = mapped_column(String(160), nullable=False)
     wallet_address: Mapped[str] = mapped_column(String(80), nullable=False)
@@ -100,7 +100,7 @@ class EligibilityDecision(Base):
 class PayoutBatch(Base):
     __tablename__ = "payout_batches"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
-    organization_id: Mapped[str] = mapped_column(String(36), default="org-basix-global", nullable=False, index=True)
+    organization_id: Mapped[str] = mapped_column(String(36), default="org-fundguard-global", nullable=False, index=True)
     competition_id: Mapped[str] = mapped_column(ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True)
     policy_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     status: Mapped[str] = mapped_column(String(24), default="proposed", nullable=False)
@@ -214,7 +214,7 @@ class AuditEvent(Base):
 class AgentRun(Base):
     __tablename__ = "agent_runs"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
-    organization_id: Mapped[str] = mapped_column(String(36), default="org-basix-global", nullable=False, index=True)
+    organization_id: Mapped[str] = mapped_column(String(36), default="org-fundguard-global", nullable=False, index=True)
     competition_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     intent: Mapped[str] = mapped_column(String(80), nullable=False)
     prompt: Mapped[str] = mapped_column(Text, default="", nullable=False)
