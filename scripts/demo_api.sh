@@ -27,20 +27,22 @@ curl -fsS "$BASE/competitions/$CID/policies" | python3 -m json.tool | head -n 30
 # 4. Stellar Testnet Keypair Generation & Custody Query
 echo -e "\n[4/13] Stellar Testnet Custody & Ed25519 StrKey Generation..."
 curl -fsS "$BASE/stellar/custody" | python3 -m json.tool | head -n 15
-GEN_KP="$(curl -fsS -X POST "$BASE/stellar/generate-keypair?fund_via_friendbot=false")"
-TESTNET_PK="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["public_key"])' <<< "$GEN_KP")"
-echo "Generated valid testnet recipient keypair: $TESTNET_PK"
+GEN_KP1="$(curl -fsS -X POST "$BASE/stellar/generate-keypair?fund_via_friendbot=false")"
+TESTNET_PK1="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["public_key"])' <<< "$GEN_KP1")"
+GEN_KP2="$(curl -fsS -X POST "$BASE/stellar/generate-keypair?fund_via_friendbot=false")"
+TESTNET_PK2="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["public_key"])' <<< "$GEN_KP2")"
+echo "Generated valid testnet recipient keypairs: $TESTNET_PK1 and $TESTNET_PK2"
 
 # 5. Register recipients
 echo -e "\n[5/13] Registering Winning Teams..."
 R1="$(curl -fsS -X POST "$BASE/competitions/$CID/recipients" \
   -H 'Content-Type: application/json' \
-  -d "{\"display_name\":\"Team Northstar\",\"wallet_address\":\"$TESTNET_PK\"}")"
+  -d "{\"display_name\":\"Team Northstar\",\"wallet_address\":\"$TESTNET_PK1\"}")"
 RID1="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' <<< "$R1")"
 
 R2="$(curl -fsS -X POST "$BASE/competitions/$CID/recipients" \
   -H 'Content-Type: application/json' \
-  -d '{"display_name":"Team MeTTaLogic","wallet_address":"GBZXN7PIRZGNMHGA728R420SFUNDGUARDDEMO1234567890ABCDEF12345678"}')"
+  -d "{\"display_name\":\"Team MeTTaLogic\",\"wallet_address\":\"$TESTNET_PK2\"}")"
 RID2="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' <<< "$R2")"
 
 echo "Registered: $RID1 (Team Northstar) and $RID2 (Team MeTTaLogic)"

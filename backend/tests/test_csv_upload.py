@@ -1,5 +1,6 @@
 import io
 
+
 def test_csv_template_endpoint(client):
     c = client
     comp = c.post("/api/v1/competitions", json={"name": "CSV Test Comp"}).json()

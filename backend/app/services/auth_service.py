@@ -1,14 +1,13 @@
 import hashlib
 import re
 import secrets
-from datetime import UTC, datetime
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models import Competition, Membership, Organization, UserAccount
 from app.schemas import UserLoginRequest, UserRegisterRequest
-from app.services.workflows import correlation_id, create_competition
+from app.services.workflows import create_competition
 
 
 def hash_password(password: str, salt: str | None = None) -> str:

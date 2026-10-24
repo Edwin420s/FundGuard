@@ -13,7 +13,7 @@ from app.agent.tools import (
     tool_reconcile_payout,
     tool_validate_payout_batch,
 )
-from app.models import AgentRun, AgentToolCall
+from app.models import AgentRun, AgentToolCall, Competition
 
 
 class OmegaAgentOrchestrator:
@@ -26,10 +26,13 @@ class OmegaAgentOrchestrator:
         context = context or {}
         self.metta.clear_traces()
 
+        comp = self.db.get(Competition, competition_id) if competition_id else None
+        org_id = comp.organization_id if comp else "org-fundguard-global"
+
         # Check prompt injection guard via MeTTa rule
         if "ignore all rules" in prompt.lower() or "bypass" in prompt.lower():
             run = AgentRun(
-                organization_id="org-fundguard-global",
+                organization_id=org_id,
                 competition_id=competition_id,
                 intent=intent,
                 prompt=prompt,
@@ -129,7 +132,7 @@ class OmegaAgentOrchestrator:
 
         # Persist AgentRun and AgentToolCall records
         run = AgentRun(
-            organization_id="org-fundguard-global",
+            organization_id=org_id,
             competition_id=competition_id,
             intent=intent,
             prompt=prompt,

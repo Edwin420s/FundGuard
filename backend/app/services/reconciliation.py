@@ -29,6 +29,8 @@ def list_reconciliation_cases(db: Session, competition_id: str = None) -> list:
     q = db.query(ReconciliationCase)
     if competition_id:
         batch_ids = [b.id for b in db.query(PayoutBatch).filter_by(competition_id=competition_id).all()]
+        if not batch_ids:
+            return []
         q = q.filter(ReconciliationCase.batch_id.in_(batch_ids))
     cases = q.order_by(ReconciliationCase.created_at.desc()).all()
     out = []

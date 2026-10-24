@@ -130,6 +130,8 @@ def get_learning_insights(db: Session, competition_id: str | None = None) -> dic
     recipient_scores = []
     for r in rel_records:
         rec = db.get(Recipient, r.recipient_id)
+        if competition_id and rec and rec.competition_id != competition_id:
+            continue
         display_name = rec.display_name if rec else r.recipient_id
         wallet = rec.wallet_address if rec else ""
         recipient_scores.append({

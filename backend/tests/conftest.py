@@ -8,8 +8,9 @@ _TEST_DB = tempfile.NamedTemporaryFile(prefix="fundguard-test-", suffix=".db", d
 _TEST_DB.close()
 os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DB.name}"
 
-from app.database import Base, engine
-from app.main import app
+from app.database import Base, engine  # noqa: E402
+from app.main import app  # noqa: E402
+
 
 @pytest.fixture()
 def client():

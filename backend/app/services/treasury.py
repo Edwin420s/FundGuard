@@ -34,7 +34,7 @@ def get_treasury_summary(db: Session, competition_id: str) -> dict:
     total_fund = int(rules.get("total_fund", {}).get("amount_base_units", 17_000_000_000))
     currency = rules.get("total_fund", {}).get("currency", "XLM")
 
-    batches = db.query(PayoutBatch).filter_by(competition_id=competition_id).all()
+    batches = db.query(PayoutBatch).filter_by(competition_id=competition_id).order_by(PayoutBatch.created_at.asc()).all()
     batch_ids = [b.id for b in batches]
 
     payouts = db.query(Payout).filter(Payout.batch_id.in_(batch_ids)).all() if batch_ids else []
@@ -52,7 +52,7 @@ def get_treasury_summary(db: Session, competition_id: str) -> dict:
     active_batch_reserves = [
         b.reserve_base_units
         for b in batches
-        if b.status in ("confirmed", "simulated", "approved", "proposed") and b.reserve_base_units > 0
+        if b.status in ("confirmed", "simulated", "approved", "proposed") and b.reserve_base_units is not None
     ]
     if active_batch_reserves:
         carry_forward = active_batch_reserves[-1]

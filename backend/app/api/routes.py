@@ -38,8 +38,8 @@ from app.schemas import (
     UserLoginRequest,
     UserRegisterRequest,
 )
-from app.services.auth_service import authenticate_user, register_user
 from app.services.audit import add_audit
+from app.services.auth_service import authenticate_user, register_user
 from app.services.learning_service import (
     get_learning_insights,
     record_reviewer_feedback,
