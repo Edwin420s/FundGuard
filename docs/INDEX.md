@@ -14,6 +14,7 @@ Read in this order:
 10. [`STELLAR_INTEGRATION.md`](STELLAR_INTEGRATION.md) — safe integration requirements for testnet and evidence verification.
 11. [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md) — an executive product demonstration walkthrough.
 12. [`DECISIONS.md`](DECISIONS.md) — architectural decisions and rationale.
+13. [`PITCH_DECK.md`](PITCH_DECK.md) — product vision, market strategy, business model, and slides ([Download PPTX](FundGuard_by_Omega_Pitch_Deck.pptx)).
 
 ## Status convention
 

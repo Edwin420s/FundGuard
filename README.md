@@ -4,6 +4,8 @@
 
 FundGuard is enterprise-grade treasury infrastructure for grant programs, accelerators, competitions, and ecosystem funds. It unites autonomous AI batch coordination with strict, non-negotiable cryptographic governance, deterministic mathematical capital preservation, and transparent blockchain settlement.
 
+**Product Presentation**: [FundGuard Pitch Deck (PPTX)](docs/FundGuard_by_Omega_Pitch_Deck.pptx) | [Read Pitch Deck Online](docs/PITCH_DECK.md) | [Architecture](docs/ARCHITECTURE.md) | [API Reference](docs/API_REFERENCE.md)
+
 ---
 
 ## Executive Summary
